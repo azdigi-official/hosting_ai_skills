@@ -1,0 +1,562 @@
+#!/usr/bin/env bash
+# bin/cpanel — CLI điều phối thao tác cPanel cho AI agent (Claude Code / Codex).
+#
+# Triết lý: mỗi lệnh con là một wrapper an toàn quanh UAPI/API2. Khi cần một
+# chức năng chưa có lệnh riêng, dùng escape hatch:  cpanel uapi <Module> <func> k=v
+#
+# Mọi output dữ liệu là JSON ra stdout; log/diễn giải ra stderr.
+# Chạy `cpanel help` để xem danh sách lệnh.
+
+set -euo pipefail
+
+_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$_DIR/.." && pwd)"; export REPO_ROOT
+# shellcheck source=../lib/common.sh
+source "$REPO_ROOT/lib/common.sh"
+# shellcheck source=../lib/cpanel-api.sh
+source "$REPO_ROOT/lib/cpanel-api.sh"
+# shellcheck source=../lib/deploy.sh
+source "$REPO_ROOT/lib/deploy.sh"
+# shellcheck source=../lib/email-ssl.sh
+source "$REPO_ROOT/lib/email-ssl.sh"
+# shellcheck source=../lib/dns.sh
+source "$REPO_ROOT/lib/dns.sh"
+# shellcheck source=../lib/metrics.sh
+source "$REPO_ROOT/lib/metrics.sh"
+# shellcheck source=../lib/backup.sh
+source "$REPO_ROOT/lib/backup.sh"
+# shellcheck source=../lib/wp.sh
+source "$REPO_ROOT/lib/wp.sh"
+
+require_cmd curl
+
+usage() {
+  cat <<'EOF'
+cpanel — toolkit thao tác hosting cPanel qua API token
+
+  Kết nối:
+    cpanel doctor                       Kiểm tra cấu hình & kết nối tới máy chủ
+    cpanel whoami                       Liệt kê domain chính của tài khoản
+
+  Database (MySQL):
+    cpanel db:list                      Liệt kê database
+    cpanel db:create <name>             Tạo database (tên sẽ được tiền tố user_)
+    cpanel db:user-create <user> <pass> Tạo MySQL user
+    cpanel db:user-delete <user>        Xóa MySQL user
+    cpanel db:user-passwd <user> <pass> Đổi mật khẩu MySQL user
+    cpanel db:grant <user> <db> [priv]  Cấp quyền (mặc định ALL PRIVILEGES)
+    cpanel db:delete <name>             Xóa database (HỎI XÁC NHẬN ở tầng AI)
+
+  Domain:
+    cpanel domain:list                  Liệt kê toàn bộ domain (main/addon/sub/parked)
+    cpanel subdomain:add <sub> <root> [docroot]
+    cpanel subdomain:delete <sub> <root>     Xóa subdomain (xác nhận trước)
+    cpanel addon:add <domain> [subdomain] [docroot]
+
+  Backup:
+    cpanel backup:list                           Backup cPanel-managed + file trong home
+    cpanel backup:create [email]                 Full backup về home (chạy nền)
+    cpanel backup:create-ftp <host> <user> <pass> [port] [rdir] [email]
+
+  DNS:
+    cpanel dns:list <domain>                     Liệt kê bản ghi DNS (kèm line)
+    cpanel dns:add <domain> <type> <name> <ttl> <data...>
+    cpanel dns:remove <domain> <line_index>
+
+  Metrics / Health:
+    cpanel metrics:health [display]              Disk/bandwidth/MySQL/inode...
+    cpanel metrics:resource                      CPU/RAM/IO (CloudLinux LVE)
+    cpanel metrics:quota                         Dung lượng đĩa
+
+  FTP:
+    cpanel ftp:list
+    cpanel ftp:create <user> <pass> [quota_mb] [homedir]
+    cpanel ftp:passwd <user> <new_pass>
+    cpanel ftp:delete <user>
+
+  Redirect:
+    cpanel redirect:list
+    cpanel redirect:add <domain> <src_path> <target_url> [type]
+    cpanel redirect:delete <src_path>
+
+  Email:
+    cpanel email:list                            Liệt kê tài khoản email
+    cpanel email:create <user@domain> <pass> [quota_mb]
+    cpanel email:passwd <user@domain> <newpass>
+    cpanel email:quota <user@domain> <quota_mb>
+    cpanel email:delete <user@domain>
+    cpanel email:fwd-list
+    cpanel email:fwd-add <source@domain> <dest_email>
+    cpanel email:fwd-delete <source@domain> <dest_email>
+
+  SSL:
+    cpanel ssl:list                              SSL đã cài (theo host)
+    cpanel ssl:certs                             Cert trong kho
+    cpanel ssl:autossl                           Kích hoạt AutoSSL (Let's Encrypt)
+    cpanel ssl:status                            AutoSSL đang chạy?
+    cpanel ssl:install <domain> <cert> <key> [cabundle]
+
+  Debug / Log:
+    cpanel log:errors [relpath]         Đọc error_log (mặc định public_html/error_log)
+    cpanel file:read <dir> <file>       Đọc nội dung 1 file trong home
+
+  File / Deploy:
+    cpanel file:upload <local> <remotedir> [overwrite]
+    cpanel file:extract <archive> <destdir>
+    cpanel file:move <src> <destdir>
+    cpanel file:save <dir> <file> <local_content_file>
+    cpanel file:mkdir <path> <name>
+    cpanel file:delete <path>                      Xóa file/thư mục (HỎI XÁC NHẬN)
+    cpanel deploy:wp <docroot> <dbname> <dbuser> <dbpass> [table_prefix]
+    cpanel deploy:static <local_dir_hoặc_zip> <docroot>
+    cpanel deploy:laravel <local_app_dir> <app_root> [app_url]
+    cpanel git:clone <repo_url> <deploy_path>      Clone repo (VersionControl)
+    cpanel git:list                                Liệt kê repo đã tạo
+    cpanel node:create <app_root> <domain> <app_name> [startup] [env]
+    cpanel node:list                               Liệt kê Node.js app
+
+  Cron:
+    cpanel cron:list
+    cpanel cron:add <min> <hour> <day> <mon> <wday> <command>
+    cpanel cron:delete <linekey>                   (linekey lấy từ cron:list)
+
+  WordPress (qua wp-cli, KHÔNG cần SSH — chạy bằng cron một-lần):
+    cpanel wp:status [docroot]                     Version core + bản cập nhật đang chờ
+    cpanel wp:backup [docroot]                     Export DB + nén plugins/themes về home
+    cpanel wp:update-core [docroot]                Cập nhật WordPress core (+ update-db)
+    cpanel wp:update-plugins [docroot] [slug...]   Cập nhật plugin (bỏ slug = tất cả)
+    cpanel wp:update-themes [docroot] [slug...]    Cập nhật theme (bỏ slug = tất cả)
+    cpanel wp:update-all [docroot]                 Core + tất cả plugin + theme
+    cpanel wp:cli <docroot> <wp args...>           Chạy lệnh wp-cli bất kỳ
+    (docroot mặc định: public_html. ENV: WP_PHP_VERSION=ea-php82, WP_SKIP_BACKUP=1,
+     WP_WAIT_SECS=480 — host trễ cron thì tăng lên.)
+
+  Escape hatch (gọi bất kỳ hàm nào):
+    cpanel uapi  <Module> <func> [key=value ...]
+    cpanel api2  <Module> <func> [key=value ...]
+
+  Biến môi trường hữu ích:
+    CPANEL_DEBUG=1     in log debug
+    CPANEL_INSECURE=1  bỏ qua kiểm tra TLS (self-signed cert)
+EOF
+}
+
+# ---------------------------------------------------------------------------
+cmd="${1:-help}"; shift || true
+
+case "$cmd" in
+  help|-h|--help) usage ;;
+
+  doctor)
+    require_cpanel_config
+    log_info "Đang kiểm tra kết nối tới ${CPANEL_SCHEME}://${CPANEL_HOST}:${CPANEL_PORT} (user: ${CPANEL_USER})"
+    if cpanel_uapi DomainInfo list_domains >/dev/null; then
+      log_ok "Kết nối & xác thực thành công."
+    else
+      die "Không xác thực được. Kiểm tra lại CPANEL_HOST/USER/API_TOKEN."
+    fi
+    ;;
+
+  whoami)
+    require_cpanel_config
+    cpanel_uapi DomainInfo list_domains | pretty_json
+    ;;
+
+  # ---- Database --------------------------------------------------------
+  db:list)
+    require_cpanel_config
+    cpanel_uapi Mysql list_databases | pretty_json
+    ;;
+  db:create)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel db:create <name>"
+    dbname="$(cpanel_mysql_name "$1")"
+    log_info "Tên database đầy đủ: $dbname"
+    cpanel_uapi Mysql create_database name="$dbname" | pretty_json
+    ;;
+  db:user-create)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel db:user-create <user> <password>"
+    dbuser="$(cpanel_mysql_name "$1")"
+    log_info "Tên MySQL user đầy đủ: $dbuser"
+    cpanel_uapi Mysql create_user name="$dbuser" password="$2" | pretty_json
+    ;;
+  db:grant)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel db:grant <user> <db> [privileges]"
+    dbuser="$(cpanel_mysql_name "$1")"
+    dbname="$(cpanel_mysql_name "$2")"
+    log_info "Cấp quyền: user=$dbuser db=$dbname"
+    cpanel_uapi Mysql set_privileges_on_database \
+      user="$dbuser" database="$dbname" privileges="${3:-ALL PRIVILEGES}" | pretty_json
+    ;;
+  db:delete)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel db:delete <name>"
+    dbname="$(cpanel_mysql_name "$1")"
+    log_info "Xóa database: $dbname"
+    cpanel_uapi Mysql delete_database name="$dbname" | pretty_json
+    ;;
+  db:user-delete)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel db:user-delete <user>"
+    dbuser="$(cpanel_mysql_name "$1")"
+    log_info "Xóa MySQL user: $dbuser"
+    cpanel_uapi Mysql delete_user name="$dbuser" | pretty_json
+    ;;
+  db:user-passwd)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel db:user-passwd <user> <new_password>"
+    dbuser="$(cpanel_mysql_name "$1")"
+    log_info "Đổi mật khẩu MySQL user: $dbuser"
+    cpanel_uapi Mysql set_password user="$dbuser" password="$2" | pretty_json
+    ;;
+
+  # ---- Domain ----------------------------------------------------------
+  domain:list)
+    require_cpanel_config
+    cpanel_uapi DomainInfo list_domains | pretty_json
+    ;;
+  subdomain:add)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel subdomain:add <sub> <rootdomain> [docroot]"
+    local_args=(domain="$1" rootdomain="$2")
+    [ $# -ge 3 ] && local_args+=(dir="$3")
+    cpanel_uapi SubDomain addsubdomain "${local_args[@]}" | pretty_json
+    ;;
+  subdomain:delete)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel subdomain:delete <sub> <rootdomain>"
+    # cPanel định danh subdomain nội bộ theo dạng  <sub>_<rootdomain>
+    log_info "Xóa subdomain: $1.$2"
+    cpanel_api2 SubDomain delsubdomain domain="${1}_${2}" | pretty_json
+    ;;
+  addon:add)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel addon:add <domain> [subdomain] [docroot]"
+    newdomain="$1"
+    sub="${2:-$(printf '%s' "$1" | tr -cd '[:alnum:]')}"
+    docroot="${3:-public_html/$newdomain}"
+    cpanel_api2 AddonDomain addaddondomain \
+      newdomain="$newdomain" subdomain="$sub" dir="$docroot" | pretty_json
+    ;;
+
+  # ---- Debug / Log -----------------------------------------------------
+  log:errors)
+    require_cpanel_config
+    rel="${1:-public_html/error_log}"
+    dir="$(dirname "$rel")"; file="$(basename "$rel")"
+    cpanel_uapi Fileman get_file_content dir="$dir" file="$file" | pretty_json
+    ;;
+  file:read)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel file:read <dir> <file>"
+    cpanel_uapi Fileman get_file_content dir="$1" file="$2" | pretty_json
+    ;;
+  file:upload)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel file:upload <local_file> <remote_dir> [overwrite]"
+    cpanel_upload "$2" "$1" "${3:-1}" | pretty_json
+    ;;
+  file:extract)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel file:extract <archive_relpath> <dest_dir>"
+    cpanel_api2 Fileman fileop op=extract sourcefiles="$1" destfiles="$2" \
+      doubledecode=1 overwrite=1 | pretty_json
+    ;;
+  file:move)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel file:move <src> <dest_dir>"
+    cpanel_api2 Fileman fileop op=move sourcefiles="$1" destfiles="$2" | pretty_json
+    ;;
+  file:save)
+    require_cpanel_config
+    [ $# -ge 3 ] || die "Cú pháp: cpanel file:save <dir> <file> <local_content_file>"
+    [ -f "$3" ] || die "Không thấy file local: $3"
+    cpanel_uapi Fileman save_file_content dir="$1" file="$2" "content@$3" | pretty_json
+    ;;
+  file:mkdir)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel file:mkdir <path> <name>"
+    cpanel_uapi Fileman mkdir path="$1" name="$2" | pretty_json
+    ;;
+  file:delete)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel file:delete <path>  (tương đối home, vd public_html/old.txt)"
+    log_info "Xóa: $1 (KHÔNG hoàn tác — đã xác nhận?)"
+    cpanel_api2 Fileman fileop op=unlink sourcefiles="$1" destfiles="" | pretty_json
+    ;;
+
+  # ---- Cron ------------------------------------------------------------
+  cron:list)
+    require_cpanel_config
+    # Module Cron chỉ có ở API2 (không có trong UAPI trên nhiều bản cPanel).
+    cpanel_api2 Cron fetchcron | pretty_json
+    ;;
+  cron:add)
+    require_cpanel_config
+    [ $# -ge 6 ] || die "Cú pháp: cpanel cron:add <min> <hour> <day> <mon> <wday> <command>"
+    cpanel_api2 Cron add_line \
+      minute="$1" hour="$2" day="$3" month="$4" weekday="$5" command="$6" | pretty_json
+    ;;
+  cron:delete)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel cron:delete <linekey>  (linekey lấy từ cron:list)"
+    log_info "Xóa cron linekey=$1"
+    cpanel_api2 Cron remove_line linekey="$1" | pretty_json
+    ;;
+
+  # ---- WordPress -------------------------------------------------------
+  wp:status)
+    require_cpanel_config
+    wp_status "${1:-public_html}"
+    ;;
+  wp:backup)
+    require_cpanel_config
+    wp_backup "${1:-public_html}"
+    ;;
+  wp:update-core)
+    require_cpanel_config
+    wp_update "${1:-public_html}" core
+    ;;
+  wp:update-plugins)
+    require_cpanel_config
+    docroot="${1:-public_html}"; shift || true
+    wp_update "$docroot" plugins "$@"
+    ;;
+  wp:update-themes)
+    require_cpanel_config
+    docroot="${1:-public_html}"; shift || true
+    wp_update "$docroot" themes "$@"
+    ;;
+  wp:update-all)
+    require_cpanel_config
+    wp_update "${1:-public_html}" all
+    ;;
+  wp:cli)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel wp:cli <docroot> <wp args...>"
+    docroot="$1"; shift
+    wp_cli "$docroot" "$@"
+    ;;
+
+  # ---- Backup ----------------------------------------------------------
+  backup:list)
+    require_cpanel_config
+    backup_list | pretty_json
+    ;;
+  backup:create)
+    require_cpanel_config
+    backup_create "${1:-}" | pretty_json
+    ;;
+  backup:create-ftp)
+    require_cpanel_config
+    [ $# -ge 3 ] || die "Cú pháp: cpanel backup:create-ftp <host> <user> <pass> [port] [rdir] [email]"
+    backup_create_ftp "$@" | pretty_json
+    ;;
+
+  # ---- DNS -------------------------------------------------------------
+  dns:list)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel dns:list <domain>"
+    dns_list "$1" | pretty_json
+    ;;
+  dns:add)
+    require_cpanel_config
+    [ $# -ge 4 ] || die "Cú pháp: cpanel dns:add <domain> <type> <name> <ttl> <data...>  (vd: dns:add example.com A www 14400 1.2.3.4)"
+    z="$1"; t="$2"; n="$3"; ttl="$4"; shift 4
+    dns_add "$z" "$t" "$n" "$ttl" "$@" | pretty_json
+    ;;
+  dns:remove)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel dns:remove <domain> <line_index>  (line lấy từ dns:list)"
+    dns_remove "$1" "$2" | pretty_json
+    ;;
+
+  # ---- Metrics / Health ------------------------------------------------
+  metrics:health)
+    require_cpanel_config
+    metrics_health "${1:-}" | pretty_json
+    ;;
+  metrics:resource)
+    require_cpanel_config
+    metrics_resource | pretty_json
+    ;;
+  metrics:quota)
+    require_cpanel_config
+    metrics_quota
+    ;;
+
+  # ---- FTP -------------------------------------------------------------
+  ftp:list)
+    require_cpanel_config
+    cpanel_uapi Ftp list_ftp | pretty_json
+    ;;
+  ftp:create)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel ftp:create <user> <password> [quota_mb] [homedir]"
+    ftp_args=(user="$1" pass="$2" quota="${3:-0}")
+    [ $# -ge 4 ] && ftp_args+=(homedir="$4")
+    log_info "Tạo FTP user: $1 (quota: ${3:-0}MB, 0=không giới hạn)"
+    cpanel_uapi Ftp add_ftp "${ftp_args[@]}" | pretty_json
+    ;;
+  ftp:passwd)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel ftp:passwd <user> <new_password>"
+    cpanel_uapi Ftp passwd_ftp user="$1" pass="$2" | pretty_json
+    ;;
+  ftp:delete)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel ftp:delete <user>"
+    log_info "Xóa FTP user: $1"
+    cpanel_uapi Ftp delete_ftp user="$1" | pretty_json
+    ;;
+
+  # ---- Redirect (Mime) -------------------------------------------------
+  redirect:list)
+    require_cpanel_config
+    cpanel_uapi Mime list_redirects | pretty_json
+    ;;
+  redirect:add)
+    require_cpanel_config
+    [ $# -ge 3 ] || die "Cú pháp: cpanel redirect:add <domain> <src_path> <target_url> [type]  (type=permanent|temporary)"
+    cpanel_uapi Mime add_redirect domain="$1" src="$2" redirect="$3" \
+      type="${4:-permanent}" redirect_wildcard=0 | pretty_json
+    ;;
+  redirect:delete)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel redirect:delete <src_path>"
+    cpanel_uapi Mime delete_redirect src="$1" | pretty_json
+    ;;
+
+  # ---- Email -----------------------------------------------------------
+  email:list)
+    require_cpanel_config
+    cpanel_uapi Email list_pops | pretty_json
+    ;;
+  email:create)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel email:create <user@domain> <password> [quota_mb]"
+    _email_split "$1"
+    log_info "Tạo email $1 (quota: ${3:-0}MB, 0=không giới hạn)"
+    cpanel_uapi Email add_pop email="$EMAIL_LOCAL" domain="$EMAIL_DOMAIN" \
+      password="$2" quota="${3:-0}" | pretty_json
+    ;;
+  email:passwd)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel email:passwd <user@domain> <new_password>"
+    _email_split "$1"
+    cpanel_uapi Email passwd_pop email="$EMAIL_LOCAL" domain="$EMAIL_DOMAIN" \
+      password="$2" | pretty_json
+    ;;
+  email:quota)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel email:quota <user@domain> <quota_mb>"
+    _email_split "$1"
+    cpanel_uapi Email edit_pop_quota email="$EMAIL_LOCAL" domain="$EMAIL_DOMAIN" \
+      quota="$2" | pretty_json
+    ;;
+  email:delete)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel email:delete <user@domain>"
+    _email_split "$1"
+    log_info "Xóa email $1"
+    cpanel_uapi Email delete_pop email="$EMAIL_LOCAL" domain="$EMAIL_DOMAIN" | pretty_json
+    ;;
+  email:fwd-list)
+    require_cpanel_config
+    cpanel_uapi Email list_forwarders | pretty_json
+    ;;
+  email:fwd-add)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel email:fwd-add <source@domain> <dest_email>"
+    _email_split "$1"
+    log_info "Tạo forwarder $1 → $2"
+    cpanel_uapi Email add_forwarder domain="$EMAIL_DOMAIN" email="$EMAIL_LOCAL" \
+      fwdopt=fwd fwdemail="$2" | pretty_json
+    ;;
+  email:fwd-delete)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel email:fwd-delete <source@domain> <dest_email>"
+    cpanel_uapi Email delete_forwarder address="$1" forwarder="$2" | pretty_json
+    ;;
+
+  # ---- SSL -------------------------------------------------------------
+  ssl:list)
+    require_cpanel_config
+    cpanel_uapi SSL installed_hosts | pretty_json
+    ;;
+  ssl:certs)
+    require_cpanel_config
+    cpanel_uapi SSL list_certs | pretty_json
+    ;;
+  ssl:autossl)
+    require_cpanel_config
+    log_info "Kích hoạt AutoSSL (cấp/gia hạn cert Let's Encrypt cho các domain đủ điều kiện)"
+    cpanel_uapi SSL start_autossl_check | pretty_json
+    ;;
+  ssl:status)
+    require_cpanel_config
+    cpanel_uapi SSL is_autossl_check_in_progress | pretty_json
+    ;;
+  ssl:install)
+    require_cpanel_config
+    [ $# -ge 3 ] || die "Cú pháp: cpanel ssl:install <domain> <cert_file> <key_file> [cabundle_file]"
+    ssl_install "$1" "$2" "$3" "${4:-}" | pretty_json
+    ;;
+
+  # ---- Deploy ----------------------------------------------------------
+  deploy:wp)
+    require_cpanel_config
+    [ $# -ge 4 ] || die "Cú pháp: cpanel deploy:wp <docroot> <dbname> <dbuser> <dbpass> [table_prefix]"
+    deploy_wordpress "$@"
+    ;;
+  deploy:static)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel deploy:static <local_dir_hoặc_zip> <docroot>"
+    deploy_static "$1" "$2"
+    ;;
+  deploy:laravel)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel deploy:laravel <local_app_dir> <app_root> [app_url]"
+    deploy_laravel "$1" "$2" "${3:-}"
+    ;;
+  git:clone)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel git:clone <repo_url> <deploy_path> [name]"
+    git_clone "$1" "$2" "${3:-}" | pretty_json
+    ;;
+  git:list)
+    require_cpanel_config
+    cpanel_uapi VersionControl retrieve | pretty_json
+    ;;
+  node:create)
+    require_cpanel_config
+    [ $# -ge 3 ] || die "Cú pháp: cpanel node:create <app_root> <domain> <app_name> [startup_file] [node_env]"
+    node_create "$@" | pretty_json
+    ;;
+  node:list)
+    require_cpanel_config
+    cpanel_uapi PassengerApps list_applications | pretty_json
+    ;;
+
+  # ---- Escape hatch ----------------------------------------------------
+  uapi)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel uapi <Module> <func> [key=value ...]"
+    m="$1"; f="$2"; shift 2
+    cpanel_uapi "$m" "$f" "$@" | pretty_json
+    ;;
+  api2)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel api2 <Module> <func> [key=value ...]"
+    m="$1"; f="$2"; shift 2
+    cpanel_api2 "$m" "$f" "$@" | pretty_json
+    ;;
+
+  *)
+    log_err "Lệnh không hợp lệ: $cmd"
+    usage
+    exit 1
+    ;;
+esac

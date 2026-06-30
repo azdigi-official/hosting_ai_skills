@@ -1,0 +1,11 @@
+{
+  "name": "cpanel",
+  "description": "Skill AI thao tác gói hosting cPanel qua API token: database, domain, deploy, debug, email, SSL, DNS, metrics, FTP, backup, WordPress. Engine cpanel (bin/) tự vào PATH khi bật.",
+  "author": {
+    "name": "Thach Pham Ngoc",
+    "email": "thachpn165@gmail.com"
+  },
+  "homepage": "https://github.com/azdigi-official/hosting_ai_skills",
+  "repository": "https://github.com/azdigi-official/hosting_ai_skills",
+  "license": "MIT"
+}

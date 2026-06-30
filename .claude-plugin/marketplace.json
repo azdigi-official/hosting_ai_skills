@@ -1,0 +1,17 @@
+{
+  "name": "hosting-ai-skills",
+  "description": "Skill AI thao tác gói hosting (cPanel, sắp tới DirectAdmin) qua API của control panel.",
+  "owner": {
+    "name": "Thach Pham Ngoc",
+    "email": "thachpn165@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "cpanel",
+      "source": "./",
+      "description": "Bộ skill thao tác hosting cPanel qua API token (database, domain, deploy, debug, email, SSL, DNS, metrics, FTP, backup, WordPress).",
+      "category": "hosting",
+      "homepage": "https://github.com/azdigi-official/hosting_ai_skills"
+    }
+  ]
+}

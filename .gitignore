@@ -1,0 +1,15 @@
+# Bí mật — KHÔNG bao giờ commit
+.env
+.cpanel-ai.env
+*.env.local
+
+# Hệ điều hành / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Tạm
+*.log
+scratch/
+tmp/
