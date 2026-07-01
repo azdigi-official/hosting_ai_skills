@@ -66,8 +66,12 @@ Tra cứu module/hàm tại https://api.docs.cpanel.net/ (UAPI Modules).
 
 ## Quy tắc an toàn (BẮT BUỘC)
 
-1. **Luôn xác nhận với người dùng trước thao tác phá hủy hoặc không thể hoàn tác**:
-   xóa database (`db:delete`), xóa domain, xóa file, ghi đè cấu hình.
+1. **Thao tác phá hủy có cổng xác nhận trong engine.** Các lệnh xóa (`db:delete`,
+   `db:user-delete`, `subdomain:delete`, `file:delete`, `email:delete`,
+   `email:fwd-delete`, `ftp:delete`, `redirect:delete`, `dns:remove`, `cron:delete`)
+   sẽ **DỪNG** nếu chạy non-interactive mà không có xác nhận. Quy trình: hỏi người dùng
+   → sau khi đồng ý, chạy lại lệnh kèm cờ **`--yes`**. Xem trước không thực thi: thêm
+   **`--dry-run`**. (Escape hatch `uapi/api2` KHÔNG qua cổng này.)
 2. **Không in token ra ngoài.** Không echo `$CPANEL_API_TOKEN` vào output.
 3. Trước khi tạo mới (database/domain), chạy lệnh `:list` tương ứng để tránh trùng.
 4. Nếu `doctor` thất bại, dừng lại và báo người dùng kiểm tra `.env` — đừng đoán mò.

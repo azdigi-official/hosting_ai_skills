@@ -41,7 +41,8 @@ cpanel email:fwd-delete info@example.com sales@example.com
 - Tham số CLI nhận **địa chỉ đầy đủ** `user@domain`; CLI tự tách local-part và domain.
 - Đặt mật khẩu trong nháy đơn để shell không diễn giải ký tự đặc biệt; mật khẩu yếu
   có thể bị cPanel từ chối.
-- `email:delete` là thao tác phá hủy — xác nhận với người dùng trước.
+- `email:delete`/`email:fwd-delete` là thao tác phá hủy — engine chặn nếu thiếu xác nhận;
+  sau khi người dùng đồng ý, chạy lại kèm `--yes` (vd `cpanel email:delete a@b.com --yes`).
 - Domain phải đã tồn tại trên tài khoản (xem `cpanel-domain`) thì mới tạo được email.
 - Để email gửi/nhận ngoài internet, domain cần bản ghi MX trỏ đúng (xem DNS qua
   escape hatch `uapi DNS ...`). SSL cho mail server: xem `cpanel-ssl`.

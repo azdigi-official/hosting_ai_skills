@@ -48,7 +48,9 @@ Sau đó dùng thông tin này trong cấu hình ứng dụng:
 - Trước khi tạo, chạy `db:list` để tránh trùng tên.
 - Mật khẩu nên ≥ 12 ký tự, có hoa/thường/số/ký tự đặc biệt (cPanel có thể từ chối
   mật khẩu yếu). Đặt mật khẩu trong dấu nháy đơn để shell không diễn giải ký tự đặc biệt.
-- **Không bao giờ** chạy `db:delete` mà chưa xác nhận rõ ràng với người dùng.
+- **Không bao giờ** chạy `db:delete`/`db:user-delete` mà chưa xác nhận rõ ràng với người
+  dùng. Engine sẽ chặn nếu thiếu xác nhận; sau khi người dùng đồng ý, chạy lại kèm `--yes`
+  (vd `cpanel db:delete blog --yes`). Xem trước: thêm `--dry-run`.
 - Để chỉ cấp quyền hạn chế: `db:grant <user> <db> "SELECT, INSERT, UPDATE, DELETE"`.
 - Trong file cấu hình ứng dụng, **luôn dùng tên đầy đủ có tiền tố** (ví dụ
   `<user>_blog`) — đây là tên thật trong MySQL. Chạy `db:list` để lấy tên chính xác.

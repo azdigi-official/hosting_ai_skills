@@ -55,6 +55,12 @@ cpanel_uapi() {
   local module="$1" func="$2"; shift 2
   [ -z "$module" ] || [ -z "$func" ] && die "cpanel_uapi cần <Module> <function>"
 
+  if [ -n "${CPANEL_DRY_RUN:-}" ]; then
+    log_warn "[dry-run] UAPI ${module}::${func} $*"
+    printf '{"dry_run":true,"api":"uapi","module":"%s","func":"%s"}' "$module" "$func"
+    return 0
+  fi
+
   local url="${CPANEL_SCHEME}://${CPANEL_HOST}:${CPANEL_PORT}/execute/${module}/${func}"
   local data_args=()
   local kv
@@ -94,6 +100,12 @@ cpanel_uapi() {
 cpanel_api2() {
   local module="$1" func="$2"; shift 2
   [ -z "$module" ] || [ -z "$func" ] && die "cpanel_api2 cần <Module> <function>"
+
+  if [ -n "${CPANEL_DRY_RUN:-}" ]; then
+    log_warn "[dry-run] API2 ${module}::${func} $*"
+    printf '{"dry_run":true,"api":"api2","module":"%s","func":"%s"}' "$module" "$func"
+    return 0
+  fi
 
   local url="${CPANEL_SCHEME}://${CPANEL_HOST}:${CPANEL_PORT}/json-api/cpanel"
   local data_args=(
@@ -165,6 +177,13 @@ cpanel_mysql_name() {
 cpanel_upload() {
   local dir="$1" localfile="$2" overwrite="${3:-1}"
   [ -f "$localfile" ] || die "Không tìm thấy file local: $localfile"
+
+  if [ -n "${CPANEL_DRY_RUN:-}" ]; then
+    log_warn "[dry-run] Upload ${localfile} → ${dir} (overwrite=${overwrite})"
+    printf '{"dry_run":true,"api":"upload","dir":"%s"}' "$dir"
+    return 0
+  fi
+
   local url="${CPANEL_SCHEME}://${CPANEL_HOST}:${CPANEL_PORT}/execute/Fileman/upload_files"
 
   local RESP HTTP_CODE resp

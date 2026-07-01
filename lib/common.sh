@@ -38,6 +38,50 @@ log_debug() { [ -n "${CPANEL_DEBUG:-}" ] && printf '%s[dbg ] %s%s\n' "$_C_DIM" "
 die() { log_err "$*"; exit 1; }
 
 # ---------------------------------------------------------------------------
+# Quản lý thư mục tạm: đăng ký tập trung + MỘT trap dọn dẹp duy nhất.
+# Tránh bẫy trap RETURN lồng nhau (deploy_laravel gọi deploy_static). Mọi hàm
+# tạo thư mục tạm nên dùng mk_tmpdir để được tự dọn kể cả khi lỗi/Ctrl+C.
+# ---------------------------------------------------------------------------
+_TMP_DIRS=()
+mk_tmpdir() {
+  local d
+  d="$(mktemp -d)" || die "Không tạo được thư mục tạm."
+  _TMP_DIRS+=("$d")
+  printf '%s' "$d"
+}
+_cleanup_tmps() {
+  local d
+  for d in ${_TMP_DIRS[@]+"${_TMP_DIRS[@]}"}; do
+    [ -n "$d" ] && rm -rf "$d"
+  done
+}
+trap _cleanup_tmps EXIT INT TERM
+
+# ---------------------------------------------------------------------------
+# confirm_destructive <mô tả> — cổng xác nhận cho thao tác PHÁ HỦY (không hoàn tác).
+#   - CPANEL_DRY_RUN=1               → bỏ qua (chỉ mô phỏng, không thực thi thật).
+#   - CPANEL_ASSUME_YES=1 / --yes    → chạy luôn (dùng sau khi người dùng đã đồng ý).
+#   - stdin là TTY                   → hỏi trực tiếp, yêu cầu gõ đúng "yes".
+#   - non-interactive & không có yes → DỪNG với hướng dẫn (an toàn mặc định cho AI).
+# ---------------------------------------------------------------------------
+confirm_destructive() {
+  local what="$1"
+  [ -n "${CPANEL_DRY_RUN:-}" ] && return 0
+  if [ -n "${CPANEL_ASSUME_YES:-}" ]; then
+    log_warn "Xác nhận tự động (--yes): $what"
+    return 0
+  fi
+  if [ -t 0 ]; then
+    printf '%s[warn]%s %s\n' "$_C_YLW" "$_C_RST" "$what" >&2
+    printf '  Gõ "yes" để xác nhận (KHÔNG hoàn tác): ' >&2
+    local ans; IFS= read -r ans || ans=""
+    [ "$ans" = "yes" ] && return 0
+    die "Đã hủy (không nhận được 'yes')."
+  fi
+  die "Thao tác phá hủy cần xác nhận: $what — thêm cờ --yes (sau khi người dùng đồng ý) hoặc đặt CPANEL_ASSUME_YES=1."
+}
+
+# ---------------------------------------------------------------------------
 # Kiểm tra phụ thuộc
 # ---------------------------------------------------------------------------
 require_cmd() {

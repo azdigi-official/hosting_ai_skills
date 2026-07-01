@@ -167,6 +167,14 @@ wp_backup() {
 wp_update() {
   local docroot="$1" scope="$2"; shift 2 || true
   [ -n "$docroot" ] && [ -n "$scope" ] || die "wp_update cần <docroot> <scope> [slugs...]"
+  # Chuỗi slug được nhúng vào lệnh chạy trên server → chỉ cho phép ký tự slug hợp lệ
+  # (chống command injection qua cron). Slug WordPress: chữ, số, '.', '_', '-'.
+  local _s
+  for _s in "$@"; do
+    case "$_s" in
+      *[!A-Za-z0-9._-]*) die "Slug không hợp lệ: '$_s' (chỉ cho phép chữ, số, . _ -)" ;;
+    esac
+  done
   local slugs="$*" ts
   ts="$(_wp_runid)"
 
@@ -218,8 +226,12 @@ wp_update() {
 wp_cli() {
   local docroot="$1"; shift || true
   [ -n "$docroot" ] && [ $# -ge 1 ] || die "wp_cli cần <docroot> <wp args...>"
+  # Tham số được nhúng thẳng vào lệnh shell chạy qua cron. Chặn ký tự đặc biệt để
+  # tránh command injection: '%' (bẫy cron) + metachar shell. Lệnh cần payload phức
+  # tạp (quote/JSON/biến) KHÔNG chạy được qua đường cron này — đây là giới hạn có chủ đích.
   case "$*" in
-    *%*) die "Tham số chứa '%' — không hỗ trợ qua cron. Dùng cách khác." ;;
+    *%*)                 die "Tham số chứa '%' — không hỗ trợ qua cron. Dùng cách khác." ;;
+    *[\;\|\&\$\`\<\>\(\)\'\"]*) die "Tham số chứa ký tự đặc biệt (; | & \$ \` < > ( ) ' \") — không hỗ trợ qua cron (chống injection)." ;;
   esac
   _wp_exec "$docroot" "echo '=== wp $* ==='; \$WP $*; "
 }

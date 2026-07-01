@@ -3,7 +3,7 @@
 Repo này cung cấp một bộ công cụ để AI thao tác lên **gói hosting cPanel** của người
 dùng qua API token: tạo database, thêm domain, deploy, debug, cron, email...
 
-Claude Code dùng các skill trong `.claude/skills/`. Codex và các agent khác dùng tài
+Claude Code dùng các skill trong `skills/`. Codex và các agent khác dùng tài
 liệu này — nhưng **cả hai chạy chung một engine**: CLI `bin/cpanel`.
 
 ## Khởi động
@@ -38,8 +38,15 @@ cpanel doctor            # chạy trong thư mục website đó để xác minh 
 
 ## QUY TẮC AN TOÀN (bắt buộc)
 
-- **Xác nhận với người dùng trước mọi thao tác phá hủy**: `db:delete`, xóa domain, ghi
-  đè/xóa file.
+- **Thao tác phá hủy có cổng xác nhận trong engine.** Các lệnh xóa (`db:delete`,
+  `db:user-delete`, `subdomain:delete`, `file:delete`, `email:delete`,
+  `email:fwd-delete`, `ftp:delete`, `redirect:delete`, `dns:remove`, `cron:delete`)
+  sẽ **DỪNG** khi chạy non-interactive nếu không có xác nhận. Quy trình đúng:
+  1. Hỏi người dùng và nêu rõ đối tượng sẽ bị xóa (KHÔNG hoàn tác).
+  2. Sau khi người dùng đồng ý, chạy lại lệnh kèm cờ `--yes`.
+  - Muốn xem trước mà không thực thi: thêm `--dry-run` (in ra thao tác API sẽ gọi).
+  - **Lưu ý:** escape hatch `cpanel uapi/api2` gọi API thô, **KHÔNG** qua cổng xác nhận —
+    tự chịu trách nhiệm khi dùng để xóa.
 - **Không in `CPANEL_API_TOKEN`** hay mật khẩu ra log/output.
 - Chạy lệnh `:list` trước khi tạo mới để tránh trùng.
 - Nếu `doctor` lỗi → dừng và báo người dùng kiểm tra `.env`, không đoán mò.

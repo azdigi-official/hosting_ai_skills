@@ -44,7 +44,7 @@ cpanel dns:add example.com TXT @ 14400 "v=spf1 +mx ~all"
 
 ```bash
 cpanel dns:list example.com         # tìm 'line' của record cần xóa
-cpanel dns:remove example.com 21     # xóa theo line_index
+cpanel dns:remove example.com 21 --yes   # xóa theo line_index (cần --yes sau khi user đồng ý)
 ```
 
 > Cơ chế: CLI tự lấy `serial` (SOA) hiện tại rồi gọi `mass_edit_zone`. Mỗi lần ghi,

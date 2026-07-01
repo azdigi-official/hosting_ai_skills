@@ -17,7 +17,7 @@ luồng: **upload archive → giải nén trên server → di chuyển file → 
 | `file:move <src> <destdir>` | Di chuyển/đổi tên file/thư mục |
 | `file:save <dir> <file> <local_content_file>` | Ghi nội dung 1 file text (vd cấu hình) |
 | `file:mkdir <path> <name>` | Tạo thư mục |
-| `file:delete <path>` | Xóa file/thư mục (tương đối home; **xác nhận trước**) |
+| `file:delete <path>` | Xóa file/thư mục (engine chặn nếu thiếu xác nhận; chạy lại kèm `--yes`) |
 | `file:read <dir> <file>` | Đọc lại để kiểm tra |
 
 Đường dẫn server tính **tương đối thư mục home** (vd `public_html`, `public_html/blog`).

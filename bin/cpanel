@@ -135,14 +135,48 @@ cpanel — toolkit thao tác hosting cPanel qua API token
     cpanel uapi  <Module> <func> [key=value ...]
     cpanel api2  <Module> <func> [key=value ...]
 
+  Cờ toàn cục (đặt sau tên lệnh, bất kỳ vị trí):
+    --yes | -y         Bỏ qua hỏi xác nhận cho thao tác phá hủy (db:delete, file:delete...)
+                       — chỉ dùng SAU khi người dùng đã đồng ý.
+    --dry-run          Không thực thi thật; chỉ in thao tác API sẽ gọi.
+
   Biến môi trường hữu ích:
-    CPANEL_DEBUG=1     in log debug
-    CPANEL_INSECURE=1  bỏ qua kiểm tra TLS (self-signed cert)
+    CPANEL_DEBUG=1       in log debug
+    CPANEL_INSECURE=1    bỏ qua kiểm tra TLS (self-signed cert)
+    CPANEL_ASSUME_YES=1  tương đương luôn bật --yes (thận trọng)
 EOF
 }
 
 # ---------------------------------------------------------------------------
 cmd="${1:-help}"; shift || true
+
+# Cờ toàn cục (đặt ở bất kỳ vị trí nào sau tên lệnh):
+#   --yes | -y   Bỏ qua hỏi xác nhận cho thao tác phá hủy (dùng SAU khi user đã đồng ý).
+#   --dry-run    Không thực thi thật — chỉ in ra thao tác sẽ gọi.
+# Lưu ý: mật khẩu trùng đúng chuỗi "--yes"/"-y"/"--dry-run" sẽ bị lọc (cực hiếm).
+: "${CPANEL_ASSUME_YES:=}"; : "${CPANEL_DRY_RUN:=}"
+_args=()
+for _a in "$@"; do
+  case "$_a" in
+    --yes|-y)  CPANEL_ASSUME_YES=1 ;;
+    --dry-run) CPANEL_DRY_RUN=1 ;;
+    *)         _args+=("$_a") ;;
+  esac
+done
+set -- ${_args[@]+"${_args[@]}"}
+export CPANEL_ASSUME_YES CPANEL_DRY_RUN
+
+# Dry-run cho lệnh TỔ HỢP (đọc-rồi-ghi nhiều bước): không mô phỏng từng bước để
+# tránh vỡ luồng — chỉ in ý định. Lệnh một-phát được dry-run ở tầng API.
+case "$cmd" in
+  deploy:*|git:clone|node:create|wp:*)
+    if [ -n "$CPANEL_DRY_RUN" ]; then
+      log_warn "[dry-run] Lệnh tổ hợp '$cmd' — chỉ in ý định, không mô phỏng từng bước API."
+      printf '{"dry_run":true,"command":"%s","args":"%s"}\n' "$cmd" "$*"
+      exit 0
+    fi
+    ;;
+esac
 
 case "$cmd" in
   help|-h|--help) usage ;;
@@ -194,6 +228,7 @@ case "$cmd" in
     require_cpanel_config
     [ $# -ge 1 ] || die "Cú pháp: cpanel db:delete <name>"
     dbname="$(cpanel_mysql_name "$1")"
+    confirm_destructive "Xóa database: $dbname"
     log_info "Xóa database: $dbname"
     cpanel_uapi Mysql delete_database name="$dbname" | pretty_json
     ;;
@@ -201,6 +236,7 @@ case "$cmd" in
     require_cpanel_config
     [ $# -ge 1 ] || die "Cú pháp: cpanel db:user-delete <user>"
     dbuser="$(cpanel_mysql_name "$1")"
+    confirm_destructive "Xóa MySQL user: $dbuser"
     log_info "Xóa MySQL user: $dbuser"
     cpanel_uapi Mysql delete_user name="$dbuser" | pretty_json
     ;;
@@ -228,6 +264,7 @@ case "$cmd" in
     require_cpanel_config
     [ $# -ge 2 ] || die "Cú pháp: cpanel subdomain:delete <sub> <rootdomain>"
     # cPanel định danh subdomain nội bộ theo dạng  <sub>_<rootdomain>
+    confirm_destructive "Xóa subdomain: $1.$2"
     log_info "Xóa subdomain: $1.$2"
     cpanel_api2 SubDomain delsubdomain domain="${1}_${2}" | pretty_json
     ;;
@@ -283,7 +320,8 @@ case "$cmd" in
   file:delete)
     require_cpanel_config
     [ $# -ge 1 ] || die "Cú pháp: cpanel file:delete <path>  (tương đối home, vd public_html/old.txt)"
-    log_info "Xóa: $1 (KHÔNG hoàn tác — đã xác nhận?)"
+    confirm_destructive "Xóa file/thư mục: $1"
+    log_info "Xóa: $1"
     cpanel_api2 Fileman fileop op=unlink sourcefiles="$1" destfiles="" | pretty_json
     ;;
 
@@ -302,6 +340,7 @@ case "$cmd" in
   cron:delete)
     require_cpanel_config
     [ $# -ge 1 ] || die "Cú pháp: cpanel cron:delete <linekey>  (linekey lấy từ cron:list)"
+    confirm_destructive "Xóa cron linekey=$1"
     log_info "Xóa cron linekey=$1"
     cpanel_api2 Cron remove_line linekey="$1" | pretty_json
     ;;
@@ -370,6 +409,7 @@ case "$cmd" in
   dns:remove)
     require_cpanel_config
     [ $# -ge 2 ] || die "Cú pháp: cpanel dns:remove <domain> <line_index>  (line lấy từ dns:list)"
+    confirm_destructive "Xóa DNS record line=$2 khỏi zone $1"
     dns_remove "$1" "$2" | pretty_json
     ;;
 
@@ -408,6 +448,7 @@ case "$cmd" in
   ftp:delete)
     require_cpanel_config
     [ $# -ge 1 ] || die "Cú pháp: cpanel ftp:delete <user>"
+    confirm_destructive "Xóa FTP user: $1"
     log_info "Xóa FTP user: $1"
     cpanel_uapi Ftp delete_ftp user="$1" | pretty_json
     ;;
@@ -426,6 +467,7 @@ case "$cmd" in
   redirect:delete)
     require_cpanel_config
     [ $# -ge 1 ] || die "Cú pháp: cpanel redirect:delete <src_path>"
+    confirm_destructive "Xóa redirect: $1"
     cpanel_uapi Mime delete_redirect src="$1" | pretty_json
     ;;
 
@@ -460,6 +502,7 @@ case "$cmd" in
     require_cpanel_config
     [ $# -ge 1 ] || die "Cú pháp: cpanel email:delete <user@domain>"
     _email_split "$1"
+    confirm_destructive "Xóa email: $1"
     log_info "Xóa email $1"
     cpanel_uapi Email delete_pop email="$EMAIL_LOCAL" domain="$EMAIL_DOMAIN" | pretty_json
     ;;
@@ -478,6 +521,7 @@ case "$cmd" in
   email:fwd-delete)
     require_cpanel_config
     [ $# -ge 2 ] || die "Cú pháp: cpanel email:fwd-delete <source@domain> <dest_email>"
+    confirm_destructive "Xóa forwarder: $1 → $2"
     cpanel_uapi Email delete_forwarder address="$1" forwarder="$2" | pretty_json
     ;;
 

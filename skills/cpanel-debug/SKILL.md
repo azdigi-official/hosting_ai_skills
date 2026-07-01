@@ -46,7 +46,7 @@ cpanel uapi LangPHP php_set_vhost_versions vhost=example.com version=ea-php82
 ```bash
 cpanel cron:list                  # mỗi dòng có 'linekey'
 cpanel cron:add 30 3 '*' '*' '*' 'php /home/u/cron.php'
-cpanel cron:delete <linekey>      # linekey lấy từ cron:list
+cpanel cron:delete <linekey> --yes   # linekey lấy từ cron:list (cần --yes sau khi user đồng ý)
 ```
 
 ## Checklist chẩn đoán lỗi 500 / trang trắng

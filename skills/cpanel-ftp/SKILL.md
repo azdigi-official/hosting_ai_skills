@@ -16,8 +16,8 @@ cpanel ftp:create deploy 'Ftp#MatKhauManh2026!' 0 public_html/site
 # Đổi mật khẩu
 cpanel ftp:passwd deploy 'Ftp#MatKhauMoi2026!'
 
-# Xóa — dùng tên đầy đủ user@domain mà ftp:list hiển thị
-cpanel ftp:delete deploy@example.com
+# Xóa — dùng tên đầy đủ user@domain mà ftp:list hiển thị (cần --yes sau khi user đồng ý)
+cpanel ftp:delete deploy@example.com --yes
 ```
 
 - Tên đăng nhập FTP thực tế là `<user>@<maindomain>` (xem `ftp:list`). Khi xóa phải
@@ -33,7 +33,7 @@ cpanel redirect:list
 # Chuyển /khuyenmai → URL đích (301 permanent mặc định, hoặc temporary)
 cpanel redirect:add example.com /khuyenmai https://example.com/sale permanent
 
-cpanel redirect:delete /khuyenmai
+cpanel redirect:delete /khuyenmai --yes
 ```
 
 > **CẢNH BÁO (LiteSpeed):** `redirect:delete` gọi `Mime::delete_redirect` — trên một số

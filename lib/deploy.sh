@@ -32,7 +32,7 @@ deploy_wordpress() {
   dbuser="$(cpanel_mysql_name "$dbuser_in")"
 
   local work zip
-  work="$(mktemp -d)"; zip="$work/latest.zip"
+  work="$(mk_tmpdir)"; zip="$work/latest.zip"
 
   # --- 1. Tải WordPress về máy local --------------------------------------
   log_info "Tải WordPress: $WP_DOWNLOAD_URL"
@@ -154,7 +154,7 @@ deploy_static() {
   [ "$HAS_JQ" -eq 1 ] || die "Cần jq cho deploy_static."
 
   local work zip cleanup_local=0
-  work="$(mktemp -d)"
+  work="$(mk_tmpdir)"
   if [ -f "$src" ] && [[ "$src" == *.zip ]]; then
     zip="$src"
   elif [ -d "$src" ]; then
@@ -210,10 +210,13 @@ git_clone() {
   [ -z "$name" ] && name="$(basename "$path")"
 
   log_info "Clone $url → $abspath (name=$name)"
-  # source_repository là JSON object {"url":"..."}; repository_root tuyệt đối.
+  # source_repository là JSON object {"url":"..."}. Dựng bằng jq để escape an toàn
+  # (URL chứa " hoặc \ sẽ không phá vỡ JSON / chèn field lạ). jq đã bắt buộc ở trên.
+  local source_repository
+  source_repository="$(jq -nc --arg url "$url" '{url:$url}')"
   cpanel_uapi VersionControl create type=git name="$name" \
     repository_root="$abspath" \
-    source_repository="{\"url\":\"${url}\"}"
+    source_repository="$source_repository"
 }
 
 # ---------------------------------------------------------------------------
@@ -271,7 +274,7 @@ deploy_laravel() {
 
   # 2. Ghi .env trên server.
   local work envfile
-  work="$(mktemp -d)"; envfile="$work/.env"
+  work="$(mk_tmpdir)"; envfile="$work/.env"
   cat > "$envfile" <<ENV
 APP_NAME=Laravel
 APP_ENV=production

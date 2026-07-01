@@ -56,5 +56,6 @@ Tra cứu hàm tại https://api.docs.cpanel.net/ (module **DNS**, **DomainInfo*
 ## An toàn
 
 - Chạy `domain:list` trước khi thêm để tránh trùng.
-- Xóa domain là thao tác phá hủy (mất cấu hình vhost) — **xác nhận với người dùng trước**.
+- Xóa domain/subdomain là thao tác phá hủy (mất cấu hình vhost). Engine chặn nếu thiếu
+  xác nhận; sau khi người dùng đồng ý, chạy lại kèm `--yes` (vd `cpanel subdomain:delete blog example.com --yes`).
 - Sau khi thêm domain, nhắc người dùng trỏ DNS/nameserver nếu domain đăng ký ở nơi khác.
