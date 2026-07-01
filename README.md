@@ -116,19 +116,3 @@ Tra cứu module/hàm: https://api.docs.cpanel.net/
 - AI được hướng dẫn **xác nhận trước thao tác phá hủy** (xóa DB/domain/file).
 - Token mang quyền của chính tài khoản hosting, không phải root/WHM.
 
-## Stack deploy đã hỗ trợ & kiểm chứng trên server thật
-
-| Stack | Lệnh | Trạng thái |
-|-------|------|-----------|
-| Static (HTML/CSS/JS, dist build sẵn) | `deploy:static` | ✅ verify HTTP |
-| PHP + MySQL | `deploy:static` + `db:*` + `file:save` | ✅ verify HTTP + DB |
-| WordPress trọn gói | `deploy:wp` | ✅ verify HTTP + DB |
-| Laravel (không cần SSH) | `deploy:laravel` | ✅ verify HTTP + DB (SQLite) |
-| Git clone | `git:clone` / `git:list` | ✅ verify checkout |
-| Node.js (Passenger) | `node:create` / `node:list` | ✅ verify API (HTTP cần DNS) |
-
-## Lộ trình mở rộng
-
-- [x] Skill email, SSL, DNS, metrics, FTP/redirect, backup — đã verify trên server thật
-- [ ] JetBackup — cần WHM API token (token cPanel user bị 403); mở rộng khi có WHM token
-- [ ] DirectAdmin (`bin/directadmin` + `lib/directadmin-api.sh`, cùng khuôn mẫu)
