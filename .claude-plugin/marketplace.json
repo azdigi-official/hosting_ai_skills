@@ -8,6 +8,7 @@
   "plugins": [
     {
       "name": "cpanel",
+      "version": "0.1.0",
       "source": "./",
       "description": "Bộ skill thao tác hosting cPanel qua API token (database, domain, deploy, debug, email, SSL, DNS, metrics, FTP, backup, WordPress).",
       "category": "hosting",

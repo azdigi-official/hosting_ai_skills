@@ -1,5 +1,6 @@
 {
   "name": "cpanel",
+  "version": "0.1.0",
   "description": "Skill AI thao tác gói hosting cPanel qua API token: database, domain, deploy, debug, email, SSL, DNS, metrics, FTP, backup, WordPress. Engine cpanel (bin/) tự vào PATH khi bật.",
   "author": {
     "name": "Thach Pham Ngoc",

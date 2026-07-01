@@ -30,11 +30,15 @@ source "$REPO_ROOT/lib/wp.sh"
 
 require_cmd curl
 
+# Phiên bản engine (khớp .claude-plugin/plugin.json). Cập nhật cùng lúc khi release.
+CPANEL_CLI_VERSION="0.1.0"
+
 usage() {
   cat <<'EOF'
 cpanel — toolkit thao tác hosting cPanel qua API token
 
   Kết nối:
+    cpanel version                      In phiên bản engine
     cpanel doctor                       Kiểm tra cấu hình & kết nối tới máy chủ
     cpanel whoami                       Liệt kê domain chính của tài khoản
 
@@ -180,6 +184,10 @@ esac
 
 case "$cmd" in
   help|-h|--help) usage ;;
+
+  version|--version|-V)
+    printf 'cpanel (hosting_ai_skills) %s\n' "$CPANEL_CLI_VERSION"
+    ;;
 
   doctor)
     require_cpanel_config
