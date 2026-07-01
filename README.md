@@ -31,12 +31,17 @@ skills/             skill cho Claude Code (tự khám phá theo description)
   ├── cpanel-metrics/   sức khỏe tài khoản: disk, bandwidth, MySQL, LVE, quota
   ├── cpanel-ftp/       tài khoản FTP + URL redirect
   ├── cpanel-backup/    full backup về home/FTP (+ ghi chú JetBackup cần WHM token)
-  └── cpanel-wordpress/ WordPress không cần SSH: core/plugin/theme, wp-cli
+  ├── cpanel-wordpress/ WordPress không cần SSH: core/plugin/theme, wp-cli
+  ├── cpanel-php/       PHP theo domain (MultiPHP) — chỉ dùng bản alt-php (CloudLinux)
+  └── cpanel-security/  bảo mật (đọc): trạng thái 2FA, ModSecurity
 lib/deploy.sh       orchestration deploy (tải source, tạo DB, sinh wp-config)
 lib/email-ssl.sh    helper email + cài SSL thủ công
-lib/dns.sh          bản ghi DNS (giải mã base64, mass_edit_zone)
+lib/dns.sh          bản ghi DNS (giải mã base64, mass_edit_zone, DNSSEC)
 lib/metrics.sh      giám sát sức khỏe tài khoản
 lib/backup.sh       full backup (home/FTP) qua cPanel Backup gốc
+lib/php.sh          quản lý phiên bản PHP theo domain (MultiPHP)
+lib/security.sh     đọc trạng thái bảo mật (2FA, ModSecurity)
+lib/wp.sh           thao tác WordPress qua wp-cli không cần SSH
 AGENTS.md           hướng dẫn cho Codex (dùng chung engine cpanel)
 .env.example        mẫu cấu hình (sao chép thành .env)
 ```
@@ -114,7 +119,11 @@ Tra cứu module/hàm: https://api.docs.cpanel.net/
 
 ## An toàn
 
-- `.env` chứa token và đã được `.gitignore` — **không commit**.
-- AI được hướng dẫn **xác nhận trước thao tác phá hủy** (xóa DB/domain/file).
+- `.env` chứa token và đã được `.gitignore` — **không commit**. Token gửi qua file
+  cấu hình của curl (`--config`, quyền 600) thay vì tham số dòng lệnh → không lộ qua `ps aux`.
+- **Cổng xác nhận thao tác phá hủy:** các lệnh xóa/ghi có ảnh hưởng (xóa DB/domain/file,
+  ghi DNS/zone, đổi PHP, cấp quyền Remote MySQL...) dừng lại khi chạy non-interactive nếu
+  thiếu `--yes`/`-y` (hoặc biến `CPANEL_ASSUME_YES`).
+- **`--dry-run`** in thao tác API sẽ gọi mà không thực thi — xem trước trước khi chạy thật.
 - Token mang quyền của chính tài khoản hosting, không phải root/WHM.
 
