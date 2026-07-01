@@ -28,7 +28,7 @@ source "$REPO_ROOT/lib/backup.sh"
 # shellcheck source=../lib/wp.sh
 source "$REPO_ROOT/lib/wp.sh"
 
-require_cmd curl
+require_cmd curl jq
 
 # Phiên bản engine (khớp .claude-plugin/plugin.json). Cập nhật cùng lúc khi release.
 CPANEL_CLI_VERSION="0.1.0"

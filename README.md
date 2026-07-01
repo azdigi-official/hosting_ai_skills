@@ -1,5 +1,7 @@
 # hosting_ai_skills
 
+[![CI](https://github.com/azdigi-official/hosting_ai_skills/actions/workflows/ci.yml/badge.svg)](https://github.com/azdigi-official/hosting_ai_skills/actions/workflows/ci.yml)
+
 Hệ thống **skill cho AI** (Claude Code, Codex) để thao tác lên gói hosting của người
 dùng qua API của control panel: tạo database, thêm domain, deploy, debug, sửa lỗi, cron...
 

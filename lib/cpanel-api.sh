@@ -18,21 +18,35 @@
 # ---------------------------------------------------------------------------
 _curl_cpanel() {
   local url="$1"; shift
+
+  # Hook test: nếu CPANEL_CURL_MOCK được đặt, trả body giả + mã HTTP giả và KHÔNG gọi
+  # mạng. Dùng cho bats (xem test/). CPANEL_CURL_MOCK_CODE mặc định 200.
+  if [ -n "${CPANEL_CURL_MOCK:-}" ]; then
+    printf '%s\n%s' "$CPANEL_CURL_MOCK" "${CPANEL_CURL_MOCK_CODE:-200}"
+    return 0
+  fi
+
   local insecure_flag=()
   # Cho phép bỏ qua kiểm tra TLS khi host dùng self-signed cert (đặt CPANEL_INSECURE=1).
   [ -n "${CPANEL_INSECURE:-}" ] && insecure_flag=(--insecure)
 
-  local body http_code tmp
-  tmp="$(mktemp)"
+  # Token đưa vào FILE cấu hình của curl (quyền 600) thay vì -H trên dòng lệnh, để token
+  # KHÔNG lộ qua `ps aux` trên máy chủ dùng chung.
+  local body http_code tmp cfg
+  tmp="$(mktemp)"; cfg="$(mktemp)"
+  chmod 600 "$cfg"
+  printf 'header = "Authorization: cpanel %s:%s"\n' "$CPANEL_USER" "$CPANEL_API_TOKEN" > "$cfg"
+
   http_code="$(curl -sS \
     --max-time "${CPANEL_TIMEOUT:-60}" \
+    --config "$cfg" \
     "${insecure_flag[@]}" \
-    -H "Authorization: cpanel ${CPANEL_USER}:${CPANEL_API_TOKEN}" \
     -w '%{http_code}' \
     -o "$tmp" \
     "$@" \
-    "$url" 2>/dev/null)" || { rm -f "$tmp"; die "Lỗi kết nối tới $CPANEL_HOST (curl thất bại)."; }
+    "$url" 2>/dev/null)" || { rm -f "$tmp" "$cfg"; die "Lỗi kết nối tới $CPANEL_HOST (curl thất bại)."; }
 
+  rm -f "$cfg"
   body="$(cat "$tmp")"; rm -f "$tmp"
   log_debug "HTTP $http_code  URL=$url"
   printf '%s\n%s' "$body" "$http_code"
@@ -130,8 +144,7 @@ cpanel_api2() {
   fi
 
   if [ "$HAS_JQ" -eq 1 ]; then
-    local result errmsg
-    result="$(printf '%s' "$resp" | jq -r '.cpanelresult.event.result // .cpanelresult.error // empty' 2>/dev/null)"
+    local errmsg
     errmsg="$(printf '%s' "$resp" | jq -r '.cpanelresult.error // empty' 2>/dev/null)"
     if [ -n "$errmsg" ] && [ "$errmsg" != "null" ]; then
       log_err "API2 ${module}::${func} thất bại: $errmsg"

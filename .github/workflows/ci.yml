@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cài công cụ (bats)
+        run: sudo apt-get update && sudo apt-get install -y bats
+
+      - name: Kiểm tra cú pháp bash
+        run: |
+          for f in bin/cpanel lib/*.sh; do bash -n "$f"; done
+
+      - name: ShellCheck (errors + warnings)
+        run: shellcheck -S warning bin/cpanel lib/*.sh
+
+      - name: Chạy test (bats, không gọi mạng)
+        run: bats test/

@@ -7,6 +7,8 @@
 # ---------------------------------------------------------------------------
 _email_split() {
   local addr="$1"
+  # EMAIL_LOCAL/EMAIL_DOMAIN được đọc ở bin/cpanel (cross-file) — không phải biến chết.
+  # shellcheck disable=SC2034
   case "$addr" in
     *@*) EMAIL_LOCAL="${addr%@*}"; EMAIL_DOMAIN="${addr#*@}" ;;
     *)   die "Địa chỉ email phải dạng user@domain: $addr" ;;

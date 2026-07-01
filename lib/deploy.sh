@@ -153,7 +153,7 @@ deploy_static() {
   require_cmd curl
   [ "$HAS_JQ" -eq 1 ] || die "Cần jq cho deploy_static."
 
-  local work zip cleanup_local=0
+  local work zip
   work="$(mk_tmpdir)"
   if [ -f "$src" ] && [[ "$src" == *.zip ]]; then
     zip="$src"
@@ -163,7 +163,6 @@ deploy_static() {
     log_info "Nén nội dung $src"
     # Loại .git, .DS_Store và .env (không upload secret local; .env ghi riêng trên server).
     ( cd "$src" && zip -rq "$zip" . -x '.git/*' -x '.DS_Store' -x '.env' ) || { rm -rf "$work"; die "Nén thất bại."; }
-    cleanup_local=1
   else
     rm -rf "$work"; die "local_path phải là thư mục hoặc file .zip: $src"
   fi

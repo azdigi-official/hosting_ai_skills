@@ -86,7 +86,7 @@ _wp_exec() {
   local cmd
   cmd="if [ -f \$HOME/${sentinel} ]; then exit 0; fi; touch \$HOME/${sentinel}; "
   cmd+="PHP='${phpbin}'; [ -x \"\$PHP\" ] || PHP=php; "
-  cmd+="if [ ! -f \$HOME/wp-cli.phar ]; then curl -fsSL -o \$HOME/wp-cli.phar '${WP_CLI_PHAR_URL}' || true; fi; "
+  cmd+="if [ ! -s \$HOME/wp-cli.phar ]; then curl -fsSL -o \$HOME/wp-cli.phar '${WP_CLI_PHAR_URL}' || echo 'WPCLI_PHAR_DOWNLOAD_FAILED'; fi; "
   cmd+="WP=\"\$PHP \$HOME/wp-cli.phar\"; "
   cmd+="cd \$HOME/${docroot} 2>/dev/null || cd \$HOME; "
   cmd+="{ ${inner} echo '${marker}'; } > \$HOME/${logfile} 2>&1"
