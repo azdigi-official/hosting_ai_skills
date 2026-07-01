@@ -27,6 +27,8 @@ source "$REPO_ROOT/lib/metrics.sh"
 source "$REPO_ROOT/lib/backup.sh"
 # shellcheck source=../lib/wp.sh
 source "$REPO_ROOT/lib/wp.sh"
+# shellcheck source=../lib/php.sh
+source "$REPO_ROOT/lib/php.sh"
 
 require_cmd curl jq
 
@@ -118,6 +120,11 @@ cpanel — toolkit thao tác hosting cPanel qua API token
     cpanel git:list                                Liệt kê repo đã tạo
     cpanel node:create <app_root> <domain> <app_name> [startup] [env]
     cpanel node:list                               Liệt kê Node.js app
+
+  PHP (MultiPHP — chỉ dùng bản alt-php của CloudLinux):
+    cpanel php:versions                 Liệt kê các bản alt-php* đã cài
+    cpanel php:list                     PHP hiện tại của từng domain
+    cpanel php:set <domain> <alt-phpXX> Đổi PHP cho domain (chỉ alt-php*; cần --yes)
 
   Cron:
     cpanel cron:list
@@ -590,6 +597,22 @@ case "$cmd" in
   node:list)
     require_cpanel_config
     cpanel_uapi PassengerApps list_applications | pretty_json
+    ;;
+
+  # ---- PHP (MultiPHP — chỉ alt-php của CloudLinux) ---------------------
+  php:versions)
+    require_cpanel_config
+    php_versions | pretty_json
+    ;;
+  php:list)
+    require_cpanel_config
+    php_list | pretty_json
+    ;;
+  php:set)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel php:set <domain> <alt-phpXX>  (vd: php:set example.com alt-php82)"
+    confirm_destructive "Đổi PHP của $1 sang $2 (có thể ảnh hưởng hoạt động website)"
+    php_set "$1" "$2" | pretty_json
     ;;
 
   # ---- Escape hatch ----------------------------------------------------

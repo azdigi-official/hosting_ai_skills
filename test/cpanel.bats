@@ -87,6 +87,42 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "php:versions chỉ trả bản alt-php (lọc ea-php)" {
+  export CPANEL_CURL_MOCK='{"status":1,"data":{"versions":["ea-php74","alt-php81","alt-php82","ea-php82"]}}'
+  run "$CPANEL" php:versions
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"alt-php81"* ]]
+  [[ "$output" == *"alt-php82"* ]]
+  [[ "$output" != *"ea-php"* ]]
+}
+
+@test "php:set từ chối ea-php*" {
+  export CPANEL_CURL_MOCK='{"status":1,"data":{"versions":["alt-php82"]}}'
+  run "$CPANEL" php:set example.com ea-php82 --yes
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"chỉ đặt bản alt-php"* ]]
+}
+
+@test "php:set từ chối bản chưa cài" {
+  export CPANEL_CURL_MOCK='{"status":1,"data":{"versions":["alt-php82"]}}'
+  run "$CPANEL" php:set example.com alt-php99 --yes
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"chưa cài"* ]]
+}
+
+@test "php:set chấp nhận alt-php đã cài (với --yes)" {
+  export CPANEL_CURL_MOCK='{"status":1,"data":{"versions":["alt-php81","alt-php82"]}}'
+  run "$CPANEL" php:set example.com alt-php82 --yes
+  [ "$status" -eq 0 ]
+}
+
+@test "php:set bị gate chặn khi thiếu --yes" {
+  export CPANEL_CURL_MOCK='{"status":1,"data":{"versions":["alt-php82"]}}'
+  run "$CPANEL" php:set example.com alt-php82
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"cần xác nhận"* ]]
+}
+
 @test "cpanel_mysql_name tự ghép tiền tố" {
   run bash -c "export CPANEL_HOST=m CPANEL_USER=u CPANEL_API_TOKEN=t CPANEL_CURL_MOCK='{\"status\":1,\"data\":{\"prefix\":\"u_\"}}' CPANEL_ENV_FILE=/dev/null; \
     source '$BATS_TEST_DIRNAME/../lib/common.sh'; source '$BATS_TEST_DIRNAME/../lib/cpanel-api.sh'; require_cpanel_config; cpanel_mysql_name blog"

@@ -7,6 +7,9 @@ và dự án tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 ## [Unreleased]
 
 ### Added
+- **Quản lý PHP theo domain** (`php:versions`, `php:list`, `php:set`) qua MultiPHP —
+  skill `cpanel-php`. Chính sách CHỈ dùng bản `alt-php*` (CloudLinux PHP Selector),
+  từ chối `ea-php*`. `php:set` là thao tác có ảnh hưởng nên qua cổng `--yes`.
 - Cổng xác nhận trong engine cho thao tác phá hủy (`confirm_destructive`): các lệnh
   xóa dừng lại khi chạy non-interactive nếu thiếu `--yes`/`CPANEL_ASSUME_YES`.
 - Cờ toàn cục `--yes`/`-y` (bỏ qua xác nhận sau khi người dùng đồng ý) và `--dry-run`
