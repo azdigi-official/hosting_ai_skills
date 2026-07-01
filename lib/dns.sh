@@ -61,3 +61,43 @@ dns_remove() {
   log_info "Xóa record line=$line khỏi $zone"
   cpanel_uapi DNS mass_edit_zone zone="$zone" serial="$serial" remove="$line"
 }
+
+# ---------------------------------------------------------------------------
+# DNSSEC — ký số zone để chống giả mạo DNS. Sau khi bật, phải khai báo DS record
+# tại NHÀ ĐĂNG KÝ domain (registrar) thì mới có hiệu lực. enable/disable GHI zone.
+# ---------------------------------------------------------------------------
+
+# dnssec_status <domain> — DNSSEC đã bật chưa + DS record (đọc).
+dnssec_status() {
+  local domain="$1"
+  [ -n "$domain" ] || die "dnssec_status cần <domain>"
+  cpanel_uapi DNSSEC fetch_ds_records domain="$domain" \
+    | jq --arg d "$domain" '{
+        domain: $d,
+        enabled: (((.data[$d] // {}) | length) > 0),
+        ds_records: (.data[$d] // {})
+      }'
+}
+
+# dnssec_ds <domain> — in DS record để khai báo tại nhà đăng ký domain.
+dnssec_ds() {
+  local domain="$1"
+  [ -n "$domain" ] || die "dnssec_ds cần <domain>"
+  cpanel_uapi DNSSEC fetch_ds_records domain="$domain" | jq '.data'
+}
+
+# dnssec_enable <domain> — bật DNSSEC (tạo khóa + ký zone).
+dnssec_enable() {
+  local domain="$1"
+  [ -n "$domain" ] || die "dnssec_enable cần <domain>"
+  log_info "Bật DNSSEC cho $domain (nhớ thêm DS record tại nhà đăng ký domain sau đó)"
+  cpanel_uapi DNSSEC enable_dnssec domain="$domain"
+}
+
+# dnssec_disable <domain> — tắt DNSSEC (xóa khóa).
+dnssec_disable() {
+  local domain="$1"
+  [ -n "$domain" ] || die "dnssec_disable cần <domain>"
+  log_info "Tắt DNSSEC cho $domain"
+  cpanel_uapi DNSSEC disable_dnssec domain="$domain"
+}

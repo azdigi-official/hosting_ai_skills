@@ -16,6 +16,12 @@ và dự án tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
   `email:spf <domain> <record>` và `email:dkim <domain>` (ghi DNS, qua cổng `--yes`).
 - **`email:usage`** (dung lượng theo hộp thư) và **`metrics:disk-usage`** (tổng quan đĩa).
 - Ghi chú: autoresponder phụ thuộc feature của gói (một số gói tắt sẵn) nên chưa thêm lệnh riêng.
+- **Tier 2 — bảo mật:**
+  - **DNSSEC:** `dns:dnssec-status/ds` (đọc) và `dns:dnssec-enable/disable` (ghi zone, qua `--yes`).
+  - **Remote MySQL:** `db:remote-add/delete <host>` (ghi quyền, qua `--yes`).
+  - **Security (đọc):** `security:2fa-status`, `security:modsec-status` — skill `cpanel-security`.
+  - Bỏ khỏi pass: hotlink protection & SSL nâng cao (API UAPI không rõ ràng/rủi ro);
+    bật-tắt ModSecurity theo domain (không có trong UAPI người dùng trên server này).
 - Cổng xác nhận trong engine cho thao tác phá hủy (`confirm_destructive`): các lệnh
   xóa dừng lại khi chạy non-interactive nếu thiếu `--yes`/`CPANEL_ASSUME_YES`.
 - Cờ toàn cục `--yes`/`-y` (bỏ qua xác nhận sau khi người dùng đồng ý) và `--dry-run`

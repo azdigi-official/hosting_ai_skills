@@ -54,3 +54,15 @@ Sau đó dùng thông tin này trong cấu hình ứng dụng:
 - Để chỉ cấp quyền hạn chế: `db:grant <user> <db> "SELECT, INSERT, UPDATE, DELETE"`.
 - Trong file cấu hình ứng dụng, **luôn dùng tên đầy đủ có tiền tố** (ví dụ
   `<user>_blog`) — đây là tên thật trong MySQL. Chạy `db:list` để lấy tên chính xác.
+
+## Truy cập MySQL từ xa (Remote MySQL)
+
+```bash
+cpanel db:remote-add 203.0.113.10 --yes       # cho phép host/IP kết nối MySQL từ xa
+cpanel db:remote-delete 203.0.113.10 --yes    # thu hồi
+```
+
+- Dùng khi cần kết nối DB từ máy ngoài (Navicat, ứng dụng khác...). **Ghi quyền → qua cổng
+  `--yes`.**
+- **Bảo mật:** chỉ mở cho IP tin cậy cụ thể, KHÔNG mở `%` (mọi IP). UAPI không có lệnh liệt
+  kê host từ xa — quản lý danh sách qua giao diện cPanel > Remote MySQL nếu cần xem.

@@ -55,4 +55,18 @@ cpanel dns:remove example.com 21 --yes   # xóa theo line_index (cần --yes sau
 - Thay đổi DNS cần thời gian lan truyền (theo TTL). Kiểm tra bằng `dig`/`nslookup` từ ngoài.
 - DNS là mắt xích cho: trỏ domain (A), email (MX + TXT/SPF/DKIM), và **AutoSSL** (domain
   phải trỏ đúng server thì mới cấp được cert — xem `cpanel-ssl`).
-- Thao tác nâng cao (DNSSEC, sửa hàng loạt): escape hatch `cpanel uapi DNS <function>`.
+- Thao tác nâng cao (sửa hàng loạt): escape hatch `cpanel uapi DNS <function>`.
+
+## DNSSEC (chống giả mạo DNS)
+
+```bash
+cpanel dns:dnssec-status example.com          # đã bật chưa
+cpanel dns:dnssec-enable example.com --yes    # bật (ký zone) — cần --yes
+cpanel dns:dnssec-ds example.com              # DS record để KHAI BÁO tại nhà đăng ký
+cpanel dns:dnssec-disable example.com --yes   # tắt — cần --yes
+```
+
+- **Bắt buộc bước cuối:** sau khi `dnssec-enable`, phải lấy DS record (`dnssec-ds`) và
+  **khai báo tại nhà đăng ký domain (registrar)** thì DNSSEC mới có hiệu lực. Nếu không
+  khai báo DS, việc bật chỉ ký zone cục bộ, không ảnh hưởng phân giải.
+- `dnssec-enable`/`disable` ghi vào zone → qua cổng `--yes` (hỏi người dùng trước).

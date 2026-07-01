@@ -29,6 +29,8 @@ source "$REPO_ROOT/lib/backup.sh"
 source "$REPO_ROOT/lib/wp.sh"
 # shellcheck source=../lib/php.sh
 source "$REPO_ROOT/lib/php.sh"
+# shellcheck source=../lib/security.sh
+source "$REPO_ROOT/lib/security.sh"
 
 require_cmd curl jq
 
@@ -51,7 +53,9 @@ cpanel — toolkit thao tác hosting cPanel qua API token
     cpanel db:user-delete <user>        Xóa MySQL user
     cpanel db:user-passwd <user> <pass> Đổi mật khẩu MySQL user
     cpanel db:grant <user> <db> [priv]  Cấp quyền (mặc định ALL PRIVILEGES)
-    cpanel db:delete <name>             Xóa database (HỎI XÁC NHẬN ở tầng AI)
+    cpanel db:delete <name>             Xóa database (cần --yes)
+    cpanel db:remote-add <host>         Cho phép MySQL từ xa từ host/IP (cần --yes)
+    cpanel db:remote-delete <host>      Thu hồi MySQL từ xa của host (cần --yes)
 
   Domain:
     cpanel domain:list                  Liệt kê toàn bộ domain (main/addon/sub/parked)
@@ -68,6 +72,10 @@ cpanel — toolkit thao tác hosting cPanel qua API token
     cpanel dns:list <domain>                     Liệt kê bản ghi DNS (kèm line)
     cpanel dns:add <domain> <type> <name> <ttl> <data...>
     cpanel dns:remove <domain> <line_index>
+    cpanel dns:dnssec-status <domain>            DNSSEC đã bật chưa
+    cpanel dns:dnssec-ds <domain>                DS record để khai báo tại nhà đăng ký
+    cpanel dns:dnssec-enable <domain>            Bật DNSSEC (cần --yes)
+    cpanel dns:dnssec-disable <domain>           Tắt DNSSEC (cần --yes)
 
   Metrics / Health:
     cpanel metrics:health [display]              Disk/bandwidth/MySQL/inode...
@@ -147,6 +155,10 @@ cpanel — toolkit thao tác hosting cPanel qua API token
     cpanel wp:cli <docroot> <wp args...>           Chạy lệnh wp-cli bất kỳ
     (docroot mặc định: public_html. ENV: WP_PHP_VERSION=ea-php82, WP_SKIP_BACKUP=1,
      WP_WAIT_SECS=480 — host trễ cron thì tăng lên.)
+
+  Security (chỉ đọc trạng thái):
+    cpanel security:2fa-status                   2FA tài khoản đã bật chưa
+    cpanel security:modsec-status                ModSecurity (WAF) theo từng domain
 
   Escape hatch (gọi bất kỳ hàm nào):
     cpanel uapi  <Module> <func> [key=value ...]
@@ -267,6 +279,18 @@ case "$cmd" in
     dbuser="$(cpanel_mysql_name "$1")"
     log_info "Đổi mật khẩu MySQL user: $dbuser"
     cpanel_uapi Mysql set_password user="$dbuser" password="$2" | pretty_json
+    ;;
+  db:remote-add)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel db:remote-add <host_or_ip>  (cho phép kết nối MySQL từ xa)"
+    confirm_destructive "Cho phép host '$1' truy cập MySQL từ xa (mở quyền kết nối tới DB của tài khoản)"
+    cpanel_uapi Mysql add_host host="$1" | pretty_json
+    ;;
+  db:remote-delete)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel db:remote-delete <host_or_ip>"
+    confirm_destructive "Thu hồi quyền MySQL từ xa của host '$1'"
+    cpanel_uapi Mysql delete_host host="$1" | pretty_json
     ;;
 
   # ---- Domain ----------------------------------------------------------
@@ -442,6 +466,28 @@ case "$cmd" in
     [ $# -ge 2 ] || die "Cú pháp: cpanel dns:remove <domain> <line_index>  (line lấy từ dns:list)"
     confirm_destructive "Xóa DNS record line=$2 khỏi zone $1"
     dns_remove "$1" "$2" | pretty_json
+    ;;
+  dns:dnssec-status)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel dns:dnssec-status <domain>"
+    dnssec_status "$1" | pretty_json
+    ;;
+  dns:dnssec-ds)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel dns:dnssec-ds <domain>  (DS record để khai báo tại nhà đăng ký)"
+    dnssec_ds "$1" | pretty_json
+    ;;
+  dns:dnssec-enable)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel dns:dnssec-enable <domain>"
+    confirm_destructive "Bật DNSSEC cho $1 (ký zone; cần thêm DS record tại nhà đăng ký domain)"
+    dnssec_enable "$1" | pretty_json
+    ;;
+  dns:dnssec-disable)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel dns:dnssec-disable <domain>"
+    confirm_destructive "Tắt DNSSEC cho $1"
+    dnssec_disable "$1" | pretty_json
     ;;
 
   # ---- Metrics / Health ------------------------------------------------
@@ -654,6 +700,16 @@ case "$cmd" in
     [ $# -ge 2 ] || die "Cú pháp: cpanel php:set <domain> <alt-phpXX>  (vd: php:set example.com alt-php82)"
     confirm_destructive "Đổi PHP của $1 sang $2 (có thể ảnh hưởng hoạt động website)"
     php_set "$1" "$2" | pretty_json
+    ;;
+
+  # ---- Security (chỉ đọc trạng thái) -----------------------------------
+  security:2fa-status)
+    require_cpanel_config
+    security_2fa_status | pretty_json
+    ;;
+  security:modsec-status)
+    require_cpanel_config
+    security_modsec_status | pretty_json
     ;;
 
   # ---- Escape hatch ----------------------------------------------------

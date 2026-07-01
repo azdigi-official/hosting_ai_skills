@@ -161,6 +161,50 @@ setup() {
   [[ "$output" == *"disk_mb_limit"* ]]
 }
 
+@test "dns:dnssec-status báo enabled=true khi có DS" {
+  export CPANEL_CURL_MOCK='{"status":1,"data":{"example.com":{"keys":{"1":{}}}}}'
+  run "$CPANEL" dns:dnssec-status example.com
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"enabled": true'* ]]
+}
+
+@test "dns:dnssec-status báo enabled=false khi rỗng" {
+  export CPANEL_CURL_MOCK='{"status":1,"data":{"example.com":{}}}'
+  run "$CPANEL" dns:dnssec-status example.com
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"enabled": false'* ]]
+}
+
+@test "dns:dnssec-enable bị gate chặn khi thiếu --yes" {
+  export CPANEL_CURL_MOCK='{"status":1,"data":{}}'
+  run "$CPANEL" dns:dnssec-enable example.com
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"cần xác nhận"* ]]
+}
+
+@test "db:remote-add bị gate chặn khi thiếu --yes" {
+  export CPANEL_CURL_MOCK='{"status":1,"data":{}}'
+  run "$CPANEL" db:remote-add 192.0.2.10
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"cần xác nhận"* ]]
+}
+
+@test "security:2fa-status parse is_enabled" {
+  export CPANEL_CURL_MOCK='{"status":1,"data":{"is_enabled":0}}'
+  run "$CPANEL" security:2fa-status
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"two_factor_auth_enabled"* ]]
+  [[ "$output" == *"false"* ]]
+}
+
+@test "security:modsec-status parse enabled theo domain" {
+  export CPANEL_CURL_MOCK='{"status":1,"data":[{"domain":"a.com","type":"main","enabled":1}]}'
+  run "$CPANEL" security:modsec-status
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"a.com"* ]]
+  [[ "$output" == *"modsecurity_enabled"* ]]
+}
+
 @test "cpanel_mysql_name tự ghép tiền tố" {
   run bash -c "export CPANEL_HOST=m CPANEL_USER=u CPANEL_API_TOKEN=t CPANEL_CURL_MOCK='{\"status\":1,\"data\":{\"prefix\":\"u_\"}}' CPANEL_ENV_FILE=/dev/null; \
     source '$BATS_TEST_DIRNAME/../lib/common.sh'; source '$BATS_TEST_DIRNAME/../lib/cpanel-api.sh'; require_cpanel_config; cpanel_mysql_name blog"
