@@ -123,6 +123,44 @@ setup() {
   [[ "$output" == *"cần xác nhận"* ]]
 }
 
+@test "file:chmod từ chối mode không hợp lệ" {
+  run "$CPANEL" file:chmod public_html/x.php 999 --yes
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Mode không hợp lệ"* ]]
+}
+
+@test "file:chmod bị gate chặn khi thiếu --yes" {
+  run "$CPANEL" file:chmod public_html/x.php 644
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"cần xác nhận"* ]]
+}
+
+@test "email:spf từ chối record không bắt đầu v=spf1 (với --yes)" {
+  run "$CPANEL" email:spf example.com 'khong-phai-spf' --yes
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"v=spf1"* ]]
+}
+
+@test "email:spf bị gate chặn khi thiếu --yes" {
+  run "$CPANEL" email:spf example.com 'v=spf1 ~all'
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"cần xác nhận"* ]]
+}
+
+@test "email:dkim bị gate chặn khi thiếu --yes" {
+  run "$CPANEL" email:dkim example.com
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"cần xác nhận"* ]]
+}
+
+@test "metrics:disk-usage tổng hợp từ quota" {
+  export CPANEL_CURL_MOCK='{"status":1,"data":{"megabytes_used":100,"megabyte_limit":1000,"megabytes_remain":900,"inodes_used":500}}'
+  run "$CPANEL" metrics:disk-usage
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"100"* ]]
+  [[ "$output" == *"disk_mb_limit"* ]]
+}
+
 @test "cpanel_mysql_name tự ghép tiền tố" {
   run bash -c "export CPANEL_HOST=m CPANEL_USER=u CPANEL_API_TOKEN=t CPANEL_CURL_MOCK='{\"status\":1,\"data\":{\"prefix\":\"u_\"}}' CPANEL_ENV_FILE=/dev/null; \
     source '$BATS_TEST_DIRNAME/../lib/common.sh'; source '$BATS_TEST_DIRNAME/../lib/cpanel-api.sh'; require_cpanel_config; cpanel_mysql_name blog"

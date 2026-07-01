@@ -42,6 +42,7 @@ cpanel metrics:quota
 
 ## Checklist chẩn đoán nhanh
 
+0. `metrics:disk-usage` — tổng quan nhanh: đã dùng/giới hạn MB, inode, phần email chiếm bao nhiêu.
 1. `metrics:quota` — hết MB hoặc hết inode? → site không ghi được file/session/cache.
 2. `metrics:resource` — chạm trần CPU/IO/EP? → site chậm hoặc 508.
 3. `metrics:health` — bandwidth gần giới hạn? database/email quá nhiều?

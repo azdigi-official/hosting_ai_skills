@@ -48,3 +48,19 @@ cpanel email:fwd-delete info@example.com sales@example.com
   escape hatch `uapi DNS ...`). SSL cho mail server: xem `cpanel-ssl`.
 - Các chức năng khác (autoresponder, mailing list, default address) gọi qua escape
   hatch: `cpanel uapi Email <function> ...` — tra tại https://api.docs.cpanel.net/.
+  (Autoresponder phụ thuộc feature `autoresponders` của gói; có gói tắt sẵn.)
+
+## Deliverability (chống email vào spam) & dung lượng hộp thư
+
+```bash
+cpanel email:deliverability example.com          # Trạng thái SPF/DKIM (đọc từ DNS, không ghi)
+cpanel email:dkim example.com --yes              # Bật DKIM: tự tạo khóa + ghi bản ghi DNS
+cpanel email:spf example.com 'v=spf1 +mx +a ~all' --yes   # Cài/sửa SPF (ghi DNS)
+cpanel email:usage                               # Dung lượng đĩa theo từng hộp thư
+```
+
+- `email:spf`/`email:dkim` **ghi bản ghi vào DNS** → engine chặn nếu thiếu `--yes`; hỏi
+  người dùng trước, rồi chạy lại kèm `--yes`. Xem trước: `--dry-run`.
+- **SPF không tự đoán:** phải truyền chuỗi SPF đầy đủ (bắt đầu `v=spf1`). Ưu tiên giá trị
+  nhà cung cấp hosting khuyến nghị (thường có `include:` mail gateway của họ) thay vì mặc định.
+- `email:deliverability` chỉ có ý nghĩa với domain có zone riêng (main/addon), không phải subdomain.

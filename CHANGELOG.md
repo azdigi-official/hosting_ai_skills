@@ -10,6 +10,12 @@ và dự án tuân theo [Semantic Versioning](https://semver.org/lang/vi/).
 - **Quản lý PHP theo domain** (`php:versions`, `php:list`, `php:set`) qua MultiPHP —
   skill `cpanel-php`. Chính sách CHỈ dùng bản `alt-php*` (CloudLinux PHP Selector),
   từ chối `ea-php*`. `php:set` là thao tác có ảnh hưởng nên qua cổng `--yes`.
+- **`file:chmod <path> <mode>`** — đổi quyền file (sửa lỗi 403/500 sau restore/malware),
+  qua cổng `--yes`.
+- **Email deliverability:** `email:deliverability` (đọc trạng thái SPF/DKIM từ DNS),
+  `email:spf <domain> <record>` và `email:dkim <domain>` (ghi DNS, qua cổng `--yes`).
+- **`email:usage`** (dung lượng theo hộp thư) và **`metrics:disk-usage`** (tổng quan đĩa).
+- Ghi chú: autoresponder phụ thuộc feature của gói (một số gói tắt sẵn) nên chưa thêm lệnh riêng.
 - Cổng xác nhận trong engine cho thao tác phá hủy (`confirm_destructive`): các lệnh
   xóa dừng lại khi chạy non-interactive nếu thiếu `--yes`/`CPANEL_ASSUME_YES`.
 - Cờ toàn cục `--yes`/`-y` (bỏ qua xác nhận sau khi người dùng đồng ý) và `--dry-run`

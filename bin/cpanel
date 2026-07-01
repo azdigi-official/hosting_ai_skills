@@ -73,6 +73,7 @@ cpanel — toolkit thao tác hosting cPanel qua API token
     cpanel metrics:health [display]              Disk/bandwidth/MySQL/inode...
     cpanel metrics:resource                      CPU/RAM/IO (CloudLinux LVE)
     cpanel metrics:quota                         Dung lượng đĩa
+    cpanel metrics:disk-usage                    Tổng quan đĩa (đã dùng/giới hạn/inode/email)
 
   FTP:
     cpanel ftp:list
@@ -94,6 +95,10 @@ cpanel — toolkit thao tác hosting cPanel qua API token
     cpanel email:fwd-list
     cpanel email:fwd-add <source@domain> <dest_email>
     cpanel email:fwd-delete <source@domain> <dest_email>
+    cpanel email:usage                           Dung lượng đĩa theo từng hộp thư
+    cpanel email:deliverability <domain>         Trạng thái SPF/DKIM (đọc từ DNS)
+    cpanel email:spf <domain> <spf_record>       Cài/sửa SPF (ghi DNS; cần --yes)
+    cpanel email:dkim <domain>                   Bật DKIM (ghi DNS; cần --yes)
 
   SSL:
     cpanel ssl:list                              SSL đã cài (theo host)
@@ -112,7 +117,8 @@ cpanel — toolkit thao tác hosting cPanel qua API token
     cpanel file:move <src> <destdir>
     cpanel file:save <dir> <file> <local_content_file>
     cpanel file:mkdir <path> <name>
-    cpanel file:delete <path>                      Xóa file/thư mục (HỎI XÁC NHẬN)
+    cpanel file:delete <path>                      Xóa file/thư mục (cần --yes)
+    cpanel file:chmod <path> <mode>                Đổi quyền file (octal, vd 644; cần --yes)
     cpanel deploy:wp <docroot> <dbname> <dbuser> <dbpass> [table_prefix]
     cpanel deploy:static <local_dir_hoặc_zip> <docroot>
     cpanel deploy:laravel <local_app_dir> <app_root> [app_url]
@@ -339,6 +345,16 @@ case "$cmd" in
     log_info "Xóa: $1"
     cpanel_api2 Fileman fileop op=unlink sourcefiles="$1" destfiles="" | pretty_json
     ;;
+  file:chmod)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel file:chmod <path> <mode>  (vd: file:chmod public_html/x.php 644)"
+    case "$2" in
+      [0-7][0-7][0-7]|[0-7][0-7][0-7][0-7]) : ;;
+      *) die "Mode không hợp lệ: '$2' (octal 3-4 chữ số, vd 644, 0755, 600)." ;;
+    esac
+    confirm_destructive "Đổi quyền (chmod) $1 → $2"
+    cpanel_api2 Fileman fileop op=chmod sourcefiles="$1" destfiles="" metadata="$2" | pretty_json
+    ;;
 
   # ---- Cron ------------------------------------------------------------
   cron:list)
@@ -441,6 +457,10 @@ case "$cmd" in
     require_cpanel_config
     metrics_quota
     ;;
+  metrics:disk-usage)
+    require_cpanel_config
+    metrics_disk_usage | pretty_json
+    ;;
 
   # ---- FTP -------------------------------------------------------------
   ftp:list)
@@ -538,6 +558,27 @@ case "$cmd" in
     [ $# -ge 2 ] || die "Cú pháp: cpanel email:fwd-delete <source@domain> <dest_email>"
     confirm_destructive "Xóa forwarder: $1 → $2"
     cpanel_uapi Email delete_forwarder address="$1" forwarder="$2" | pretty_json
+    ;;
+  email:usage)
+    require_cpanel_config
+    email_usage | pretty_json
+    ;;
+  email:deliverability)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel email:deliverability <domain>"
+    email_deliverability "$1" | pretty_json
+    ;;
+  email:spf)
+    require_cpanel_config
+    [ $# -ge 2 ] || die "Cú pháp: cpanel email:spf <domain> <spf_record>  (vd: email:spf ex.com 'v=spf1 +mx +a ~all')"
+    confirm_destructive "Ghi/cập nhật bản ghi SPF vào DNS của $1: $2"
+    email_spf "$1" "$2" | pretty_json
+    ;;
+  email:dkim)
+    require_cpanel_config
+    [ $# -ge 1 ] || die "Cú pháp: cpanel email:dkim <domain>"
+    confirm_destructive "Bật DKIM (ghi bản ghi DNS) cho $1"
+    email_dkim "$1" | pretty_json
     ;;
 
   # ---- SSL -------------------------------------------------------------

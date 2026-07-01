@@ -18,6 +18,7 @@ luồng: **upload archive → giải nén trên server → di chuyển file → 
 | `file:save <dir> <file> <local_content_file>` | Ghi nội dung 1 file text (vd cấu hình) |
 | `file:mkdir <path> <name>` | Tạo thư mục |
 | `file:delete <path>` | Xóa file/thư mục (engine chặn nếu thiếu xác nhận; chạy lại kèm `--yes`) |
+| `file:chmod <path> <mode>` | Đổi quyền file (octal 3-4 chữ số, vd 644/0755; cần `--yes`) — sửa lỗi 403/500 sau restore/malware |
 | `file:read <dir> <file>` | Đọc lại để kiểm tra |
 
 Đường dẫn server tính **tương đối thư mục home** (vd `public_html`, `public_html/blog`).

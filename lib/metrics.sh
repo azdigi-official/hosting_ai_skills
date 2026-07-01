@@ -31,3 +31,17 @@ metrics_resource() {
 metrics_quota() {
   cpanel_uapi Quota get_quota_info | pretty_json
 }
+
+# metrics_disk_usage — tổng quan dung lượng đĩa: đã dùng/giới hạn/inode + phần email.
+metrics_disk_usage() {
+  local q email_disk
+  q="$(cpanel_uapi Quota get_quota_info)" || die "Không lấy được thông tin quota."
+  email_disk="$(cpanel_uapi Email get_main_account_disk_usage 2>/dev/null | jq -r '.data // "?"' 2>/dev/null)"
+  printf '%s' "$q" | jq --arg em "${email_disk:-?}" '{
+    disk_mb_used:   (.data.megabytes_used),
+    disk_mb_limit:  (.data.megabyte_limit),
+    disk_mb_remain: (.data.megabytes_remain),
+    inodes_used:    (.data.inodes_used),
+    email_disk:     $em
+  }'
+}
