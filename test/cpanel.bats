@@ -28,6 +28,22 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "UAPI không tham số chạy được dưới /bin/bash với nounset" {
+  export CPANEL_CURL_MOCK='{"status":1,"data":{"main_domain":"example.com"}}'
+  run /bin/bash "$CPANEL" whoami
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"main_domain"* ]]
+  [[ "$output" != *"unbound variable"* ]]
+}
+
+@test "backup:create không email chạy được dưới /bin/bash với nounset" {
+  export CPANEL_CURL_MOCK='{"status":1,"data":{"queued":true}}'
+  run /bin/bash "$CPANEL" backup:create
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"queued"* ]]
+  [[ "$output" != *"unbound variable"* ]]
+}
+
 @test "confirm gate CHẶN db:delete khi non-interactive thiếu --yes" {
   run "$CPANEL" db:delete victim
   [ "$status" -eq 1 ]

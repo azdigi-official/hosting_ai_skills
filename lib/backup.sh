@@ -27,7 +27,11 @@ backup_create() {
   local args=()
   [ -n "$email" ] && args+=(email="$email")
   log_info "Yêu cầu full backup về home (chạy nền; file backup-*.tar.gz sẽ xuất hiện khi xong)"
-  cpanel_uapi Backup fullbackup_to_homedir "${args[@]}"
+  if [ "${#args[@]}" -gt 0 ]; then
+    cpanel_uapi Backup fullbackup_to_homedir "${args[@]}"
+  else
+    cpanel_uapi Backup fullbackup_to_homedir
+  fi
 }
 
 # backup_create_ftp <host> <user> <pass> [port] [rdir] [email] — full backup lên FTP từ xa.

@@ -26,10 +26,6 @@ _curl_cpanel() {
     return 0
   fi
 
-  local insecure_flag=()
-  # Cho phép bỏ qua kiểm tra TLS khi host dùng self-signed cert (đặt CPANEL_INSECURE=1).
-  [ -n "${CPANEL_INSECURE:-}" ] && insecure_flag=(--insecure)
-
   # Token đưa vào FILE cấu hình của curl (quyền 600) thay vì -H trên dòng lệnh, để token
   # KHÔNG lộ qua `ps aux` trên máy chủ dùng chung.
   local body http_code tmp cfg
@@ -37,10 +33,12 @@ _curl_cpanel() {
   chmod 600 "$cfg"
   printf 'header = "Authorization: cpanel %s:%s"\n' "$CPANEL_USER" "$CPANEL_API_TOKEN" > "$cfg"
 
-  http_code="$(curl -sS \
-    --max-time "${CPANEL_TIMEOUT:-60}" \
-    --config "$cfg" \
-    "${insecure_flag[@]}" \
+  local curl_args=(-sS --max-time "${CPANEL_TIMEOUT:-60}" --config "$cfg")
+  # Cho phép bỏ qua kiểm tra TLS khi host dùng self-signed cert (đặt CPANEL_INSECURE=1).
+  [ -n "${CPANEL_INSECURE:-}" ] && curl_args+=(--insecure)
+
+  http_code="$(curl \
+    "${curl_args[@]}" \
     -w '%{http_code}' \
     -o "$tmp" \
     "$@" \
@@ -76,14 +74,14 @@ cpanel_uapi() {
   fi
 
   local url="${CPANEL_SCHEME}://${CPANEL_HOST}:${CPANEL_PORT}/execute/${module}/${func}"
-  local data_args=()
+  local data_args=(-X POST)
   local kv
   for kv in "$@"; do
     data_args+=(--data-urlencode "$kv")
   done
 
   local RESP HTTP_CODE resp
-  _split_http "$(_curl_cpanel "$url" -X POST "${data_args[@]}")"
+  _split_http "$(_curl_cpanel "$url" "${data_args[@]}")"
   resp="$RESP"
 
   if [ "${HTTP_CODE:0:1}" != "2" ]; then
@@ -123,6 +121,7 @@ cpanel_api2() {
 
   local url="${CPANEL_SCHEME}://${CPANEL_HOST}:${CPANEL_PORT}/json-api/cpanel"
   local data_args=(
+    -X POST
     --data-urlencode "cpanel_jsonapi_user=${CPANEL_USER}"
     --data-urlencode "cpanel_jsonapi_apiversion=2"
     --data-urlencode "cpanel_jsonapi_module=${module}"
@@ -134,7 +133,7 @@ cpanel_api2() {
   done
 
   local RESP HTTP_CODE resp
-  _split_http "$(_curl_cpanel "$url" -X POST "${data_args[@]}")"
+  _split_http "$(_curl_cpanel "$url" "${data_args[@]}")"
   resp="$RESP"
 
   if [ "${HTTP_CODE:0:1}" != "2" ]; then
